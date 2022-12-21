@@ -1,19 +1,16 @@
-use super::{Modulator, Phase};
+use super::{DiscreteTime, Signal};
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct AmplitudeModulator {
-    pub carrier: u32,
-    pub information: u32,
+    pub carrier: Arc<dyn Signal>,
+    pub information: Arc<dyn Signal>,
 }
 
-impl Modulator for AmplitudeModulator {
-    fn sample(&self, phase: Phase) -> f64 {
-        let information_amplitude =
-            (std::f64::consts::TAU * phase.as_float() * self.information as f64).sin();
-        let information_amplitude = (information_amplitude + 1.0) / 2.0;
-
-        let carrier_amplitude =
-            (std::f64::consts::TAU * phase.as_float() * self.carrier as f64).sin();
+impl Signal for AmplitudeModulator {
+    fn sample(&self, t: &DiscreteTime) -> f64 {
+        let information_amplitude = (self.information.sample(t) + 1.0) / 2.0;
+        let carrier_amplitude = self.carrier.sample(t);
 
         information_amplitude * carrier_amplitude
     }

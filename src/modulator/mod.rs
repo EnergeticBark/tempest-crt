@@ -1,9 +1,13 @@
 mod am;
-mod phase;
+mod discrete_time;
+mod fm;
+mod wave;
 
 pub use am::*;
-pub use phase::*;
+pub use discrete_time::*;
+pub use fm::*;
+pub use wave::*;
 
-pub trait Modulator {
-    fn sample(&self, phase: Phase) -> f64;
+pub trait Signal: Send + Sync {
+    fn sample(&self, t: &DiscreteTime) -> f64;
 }
