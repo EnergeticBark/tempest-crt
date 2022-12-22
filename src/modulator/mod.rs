@@ -9,5 +9,5 @@ pub use fm::*;
 pub use wave::*;
 
 pub trait Signal: Send + Sync {
-    fn sample(&self, t: &DiscreteTime) -> f64;
+    fn sample(&self, t: &DiscreteTime) -> f32;
 }

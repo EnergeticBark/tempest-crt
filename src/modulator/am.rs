@@ -8,7 +8,7 @@ pub struct AmplitudeModulator {
 }
 
 impl Signal for AmplitudeModulator {
-    fn sample(&self, t: &DiscreteTime) -> f64 {
+    fn sample(&self, t: &DiscreteTime) -> f32 {
         let information_amplitude = (self.information.sample(t) + 1.0) / 2.0;
         let carrier_amplitude = self.carrier.sample(t);
 

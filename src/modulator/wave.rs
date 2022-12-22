@@ -11,8 +11,9 @@ impl Sine {
 }
 
 impl Signal for Sine {
-    fn sample(&self, t: &DiscreteTime) -> f64 {
-        (std::f64::consts::TAU * self.frequency as f64 * t.as_float()).sin()
+    fn sample(&self, t: &DiscreteTime) -> f32 {
+        let phase = t.to_phase(self.frequency);
+        (std::f32::consts::TAU * phase).sin()
     }
 }
 
@@ -27,8 +28,9 @@ impl Square {
 }
 
 impl Signal for Square {
-    fn sample(&self, t: &DiscreteTime) -> f64 {
-        if (t.as_float() * self.frequency as f64) % 1.0 < 0.5 {
+    fn sample(&self, t: &DiscreteTime) -> f32 {
+        let phase = t.to_phase(self.frequency);
+        if phase < 0.5 {
             return 1.0;
         }
         -1.0
