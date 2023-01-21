@@ -26,8 +26,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let window = {
         let monitor = event_loop
             .available_monitors()
-            //.find(|monitor| monitor.name().unwrap() == "HDMI-0")
-            .nth(1) // workaround for my shitty wayland setup because wayland sucks
+            .find(|monitor| monitor.name().unwrap() == "HDMI-1")
+            //.nth(0) // workaround for my shitty wayland setup because wayland sucks
             .unwrap();
         WindowBuilder::new()
             .with_fullscreen(Some(Fullscreen::Borderless(Some(monitor))))
@@ -40,14 +40,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let mut wave_freq = 500;
+    let mut pcm_loader: PcmLoader<Signed16Le> = PcmLoader::open("meow.raw", 20400).unwrap();
+    pcm_loader.set_interp(Interpolation::Linear);
     let mut modulator = AmplitudeModulator {
         carrier: Arc::from(Sine::from_freq(1700000)),
-        information: Arc::from(Sine::from_freq(wave_freq)),
+        information: Arc::from(pcm_loader.samples()),
     };
-    /*let mut modulator = FrequencyModulator {
-        carrier: 88000000,
-        information: Arc::from(Sine::from_freq(wave_freq)),
-    };*/
     let mut total_index_offset = 0;
 
     event_loop.run(move |event, _, control_flow| {
@@ -64,6 +62,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 *control_flow = ControlFlow::Exit;
                 return;
             }
+
+            // If the next frame's offset would be more than DOT_CLOCK, then we've been drawing
+            // frames for 1 second. Time to load the next second of PCM audio.
+            if (total_index_offset + H_TOTAL * V_TOTAL) >= DOT_CLOCK {
+                pcm_loader.next_second().unwrap();
+                modulator = AmplitudeModulator {
+                    carrier: Arc::from(Sine::from_freq(1700000)),
+                    information: Arc::from(pcm_loader.samples()),
+                };
+                /*audio_file.read_exact(&mut second_of_audio).unwrap();
+                modulator = FrequencyModulator::from_pcm(29333333, &second_of_audio, DOT_CLOCK);*/
+            }
+
             // Add the number of pixels in a total frame to offset the next frame's pixel indices.
             // For example, if there are 100 total pixels in a frame and we're on the 40th
             // frame, then our offset will be 4000 and the next pixel index will be 4001 and so on.
@@ -72,13 +83,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             total_index_offset = (total_index_offset + H_TOTAL * V_TOTAL) % DOT_CLOCK;
         }
 
-        if input.key_pressed(VirtualKeyCode::LBracket) {
+        /*if input.key_pressed(VirtualKeyCode::LBracket) {
             wave_freq -= 100;
             modulator.information = Arc::from(Sine::from_freq(wave_freq));
         } else if input.key_pressed(VirtualKeyCode::RBracket) {
             wave_freq += 100;
             modulator.information = Arc::from(Sine::from_freq(wave_freq));
-        }
+        }*/
 
         if input.update(&event) {
             window.request_redraw();
