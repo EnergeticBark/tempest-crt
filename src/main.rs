@@ -71,8 +71,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     carrier: Arc::from(Sine::from_freq(1700000)),
                     information: Arc::from(pcm_loader.samples()),
                 };
-                /*audio_file.read_exact(&mut second_of_audio).unwrap();
-                modulator = FrequencyModulator::from_pcm(29333333, &second_of_audio, DOT_CLOCK);*/
             }
 
             // Add the number of pixels in a total frame to offset the next frame's pixel indices.
