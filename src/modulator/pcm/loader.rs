@@ -1,17 +1,17 @@
 use std::error::Error;
 use std::fs::File;
-use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
+use std::io::{BufRead, BufReader, Seek, SeekFrom};
 use std::marker::PhantomData;
 use std::path::Path;
 
-use super::{Interpolation, LerpPcm, Pcm, PcmFormat, Signal};
+use super::{Interpolation, Linear, Nearest, Pcm, PcmFormat, Signal};
 
 const BUFFER_PADDING: usize = 340;
 
 pub struct PcmLoader<T: PcmFormat> {
     buffer: BufReader<File>,
-    sample_rate: usize,
-    interpolation: Interpolation,
+    pub(super) sample_rate: usize,
+    pub(super) interpolation: Interpolation,
     phantom: PhantomData<T>,
 }
 
@@ -40,18 +40,22 @@ where
         Ok(())
     }
 
-    pub fn samples(&mut self) -> Box<dyn Signal> {
+    pub(super) fn pcm(&self) -> Pcm<T> {
         let bytes = self.buffer.buffer();
         let samples: Vec<T> = T::from_bytes(bytes);
 
-        let pcm = Pcm {
+        Pcm {
             samples,
             sample_rate: self.sample_rate,
-        };
+        }
+    }
+
+    pub fn samples(&self) -> Box<dyn Signal> {
+        let pcm = self.pcm();
 
         match &self.interpolation {
-            Nearest => Box::new(pcm),
-            Linear => Box::new(LerpPcm(pcm)),
+            Interpolation::Nearest => Box::new(Nearest(pcm)),
+            Interpolation::Linear => Box::new(Linear(pcm)),
         }
     }
 

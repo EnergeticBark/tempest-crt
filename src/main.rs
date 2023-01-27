@@ -1,7 +1,7 @@
-const H_TOTAL: u32 = 1344;
-const V_TOTAL: u32 = 806;
-const H_DISPLAY: u32 = 1024;
-const V_DISPLAY: u32 = 768;
+const H_TOTAL: u32 = 1688;
+const V_TOTAL: u32 = 1066;
+const H_DISPLAY: u32 = 1280;
+const V_DISPLAY: u32 = 1024;
 const VERTICAL_SYNC: f64 = 60.00;
 const DOT_CLOCK: u32 = (H_TOTAL as f64 * V_TOTAL as f64 * VERTICAL_SYNC) as u32;
 const THREADS: u32 = 4;
@@ -40,11 +40,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let mut wave_freq = 500;
-    let mut pcm_loader: PcmLoader<Signed16Le> = PcmLoader::open("meow.raw", 20400).unwrap();
-    pcm_loader.set_interp(Interpolation::Linear);
-    let mut modulator = AmplitudeModulator {
+    let mut pcm_loader: PcmLoader<Signed16Le> = PcmLoader::open("meow.raw", 38000).unwrap();
+    //pcm_loader.set_interp(Interpolation::Linear);
+    let mut integrated_loader = PreintegratedLoader::new(pcm_loader, DOT_CLOCK);
+    /*let mut modulator = AmplitudeModulator {
         carrier: Arc::from(Sine::from_freq(1700000)),
         information: Arc::from(pcm_loader.samples()),
+    };*/
+    let mut modulator = FrequencyModulator {
+        carrier: Arc::from(Sine::from_freq(44000000)),
+        information: Arc::from(integrated_loader.samples()),
     };
     let mut total_index_offset = 0;
 
@@ -66,10 +71,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // If the next frame's offset would be more than DOT_CLOCK, then we've been drawing
             // frames for 1 second. Time to load the next second of PCM audio.
             if (total_index_offset + H_TOTAL * V_TOTAL) >= DOT_CLOCK {
-                pcm_loader.next_second().unwrap();
-                modulator = AmplitudeModulator {
-                    carrier: Arc::from(Sine::from_freq(1700000)),
-                    information: Arc::from(pcm_loader.samples()),
+                integrated_loader.next_second().unwrap();
+                modulator = FrequencyModulator {
+                    carrier: Arc::from(Sine::from_freq(44000000)),
+                    information: Arc::from(integrated_loader.samples()),
                 };
             }
 

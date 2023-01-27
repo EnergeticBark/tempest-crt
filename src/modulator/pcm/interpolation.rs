@@ -5,9 +5,23 @@ pub enum Interpolation {
     Linear,
 }
 
-pub struct LerpPcm<T: PcmFormat>(pub(super) Pcm<T>);
+pub struct Nearest<T>(pub(super) T);
 
-impl<T> Signal for LerpPcm<T>
+impl<T> Signal for Nearest<Pcm<T>>
+where
+    T: PcmFormat,
+{
+    fn sample(&self, t: &DiscreteTime) -> f32 {
+        let sample_index =
+            (t.numerator as f32 / t.denominator as f32 * self.0.sample_rate as f32) as usize;
+
+        self.0.samples[sample_index].amplitude()
+    }
+}
+
+pub struct Linear<T>(pub(super) T);
+
+impl<T> Signal for Linear<Pcm<T>>
 where
     T: PcmFormat,
 {
