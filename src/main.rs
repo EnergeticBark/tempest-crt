@@ -55,7 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     event_loop.run(move |event, _, control_flow| {
         if let Event::RedrawRequested(_) = event {
-            let frame = pixels.get_frame_mut();
+            let frame = pixels.frame_mut();
             //draw_frame(&modulator, total_index_offset, frame);
             draw_frame_threaded(Arc::new(modulator.clone()), total_index_offset, frame);
 
