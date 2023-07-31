@@ -1,10 +1,10 @@
-const H_TOTAL: u32 = 1688;
-const V_TOTAL: u32 = 1066;
-const H_DISPLAY: u32 = 1280;
-const V_DISPLAY: u32 = 1024;
+const H_TOTAL: u32 = 1344;
+const V_TOTAL: u32 = 806;
+const H_DISPLAY: u32 = 1024;
+const V_DISPLAY: u32 = 768;
 const VERTICAL_SYNC: f64 = 60.00;
 const DOT_CLOCK: u32 = (H_TOTAL as f64 * V_TOTAL as f64 * VERTICAL_SYNC) as u32;
-const THREADS: u32 = 4;
+const THREADS: u32 = 8;
 
 use std::sync::{mpsc, Arc};
 use std::thread;
@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let monitor = event_loop
             .available_monitors()
             .find(|monitor| monitor.name().unwrap() == "HDMI-1")
-            //.nth(0) // workaround for my shitty wayland setup because wayland sucks
+            //.nth(1) // workaround for my shitty wayland setup because wayland sucks
             .unwrap();
         WindowBuilder::new()
             .with_fullscreen(Some(Fullscreen::Borderless(Some(monitor))))
@@ -39,17 +39,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Pixels::new(H_DISPLAY, V_DISPLAY, surface_texture)?
     };
 
-    let mut wave_freq = 500;
-    let mut pcm_loader: PcmLoader<Signed16Le> = PcmLoader::open("meow.raw", 38000).unwrap();
+    //let mut wave_freq = 0;
+    let pcm_loader: PcmLoader<Signed16Le> = PcmLoader::open("/tmp/virtualdevice", 44100).unwrap();
     //pcm_loader.set_interp(Interpolation::Linear);
-    let mut integrated_loader = PreintegratedLoader::new(pcm_loader, DOT_CLOCK);
+    let integrated_loader = PreintegratedLoader::new(pcm_loader);
+    let mut carrier = Square::from_freq(44000000, DOT_CLOCK);
+    let mut information = integrated_loader;
+    //let mut information = pcm_loader;
+    //let mut information = Sine::from_freq(wave_freq, DOT_CLOCK);
     /*let mut modulator = AmplitudeModulator {
-        carrier: Arc::from(Sine::from_freq(1700000)),
-        information: Arc::from(pcm_loader.samples()),
+        carrier: Arc::from(carrier),
+        information: Arc::from(information.samples()),
     };*/
     let mut modulator = FrequencyModulator {
-        carrier: Arc::from(Sine::from_freq(44000000)),
-        information: Arc::from(integrated_loader.samples()),
+        carrier: Arc::from(carrier),
+        information: Arc::from(information.samples()),
     };
     let mut total_index_offset = 0;
 
@@ -57,7 +61,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if let Event::RedrawRequested(_) = event {
             let frame = pixels.frame_mut();
             //draw_frame(&modulator, total_index_offset, frame);
-            draw_frame_threaded(Arc::new(modulator.clone()), total_index_offset, frame);
+            draw_frame_threaded(Arc::new(modulator.clone()), frame);
 
             if pixels
                 .render()
@@ -68,15 +72,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return;
             }
 
+            carrier.next_frame(H_TOTAL * V_TOTAL);
+            information.next_frame().unwrap();
+            modulator = FrequencyModulator {
+                carrier: Arc::from(carrier),
+                information: Arc::from(information.samples()),
+            };
+
             // If the next frame's offset would be more than DOT_CLOCK, then we've been drawing
             // frames for 1 second. Time to load the next second of PCM audio.
-            if (total_index_offset + H_TOTAL * V_TOTAL) >= DOT_CLOCK {
-                integrated_loader.next_second().unwrap();
+            /*if (total_index_offset + H_TOTAL * V_TOTAL) >= DOT_CLOCK {
+                /*integrated_loader.next_second().unwrap();
                 modulator = FrequencyModulator {
-                    carrier: Arc::from(Sine::from_freq(44000000)),
+                    carrier: Arc::from(Square::from_freq(29333333)),
                     information: Arc::from(integrated_loader.samples()),
+                };*/
+                modulator = AmplitudeModulator {
+                    carrier: Arc::from(Sine::from_freq(540000, DOT_CLOCK)),
+                    information: Arc::from(Square::from_freq(wave_freq, DOT_CLOCK)),
                 };
-            }
+            }*/
 
             // Add the number of pixels in a total frame to offset the next frame's pixel indices.
             // For example, if there are 100 total pixels in a frame and we're on the 40th
@@ -87,11 +102,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         /*if input.key_pressed(VirtualKeyCode::LBracket) {
-            wave_freq -= 100;
-            modulator.information = Arc::from(Sine::from_freq(wave_freq));
+            wave_freq -= 5;
+            information = Sine::from_freq(wave_freq, DOT_CLOCK);
+            println!("{wave_freq}");
         } else if input.key_pressed(VirtualKeyCode::RBracket) {
-            wave_freq += 100;
-            modulator.information = Arc::from(Sine::from_freq(wave_freq));
+            wave_freq += 5;
+            information = Sine::from_freq(wave_freq, DOT_CLOCK);
+            println!("{wave_freq}");
         }*/
 
         if input.update(&event) {
@@ -101,15 +118,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[allow(dead_code)]
-fn draw_frame(modulator: &dyn Signal, total_index_offset: u32, frame: &mut [u8]) {
+fn draw_frame(modulator: &dyn Signal, frame: &mut [u8]) {
     for pixel in frame.chunks_exact_mut(4).enumerate() {
         let total_index = visible_to_total_index(pixel.0);
-        let t = DiscreteTime {
-            numerator: total_index + total_index_offset,
-            denominator: DOT_CLOCK,
-        };
 
-        let grayscale = (modulator.sample(&t) * (255.0 / 2.0) + 255.0 / 2.0).round() as u8;
+        let grayscale = (modulator.sample(total_index) * (255.0 / 2.0) + 255.0 / 2.0).round() as u8;
         pixel.1[0] = grayscale;
         pixel.1[1] = grayscale;
         pixel.1[2] = grayscale;
@@ -117,7 +130,7 @@ fn draw_frame(modulator: &dyn Signal, total_index_offset: u32, frame: &mut [u8])
     }
 }
 
-fn draw_frame_threaded(modulator: Arc<dyn Signal>, total_index_offset: u32, frame: &mut [u8]) {
+fn draw_frame_threaded(modulator: Arc<dyn Signal>, frame: &mut [u8]) {
     let (tx, rx) = mpsc::channel();
 
     let pixels_per_thread = H_DISPLAY * V_DISPLAY / THREADS;
@@ -130,12 +143,8 @@ fn draw_frame_threaded(modulator: Arc<dyn Signal>, total_index_offset: u32, fram
             let grayscale_chunk = chunk
                 .map(|pixel_index| {
                     let total_index = visible_to_total_index(pixel_index as usize);
-                    let t = DiscreteTime {
-                        numerator: total_index + total_index_offset,
-                        denominator: DOT_CLOCK,
-                    };
 
-                    (modulator.sample(&t) * (255.0 / 2.0) + 255.0 / 2.0).round() as u8
+                    (modulator.sample(total_index) * (255.0 / 2.0) + 255.0 / 2.0).round() as u8
                 })
                 .collect::<Vec<_>>();
 
@@ -147,12 +156,8 @@ fn draw_frame_threaded(modulator: Arc<dyn Signal>, total_index_offset: u32, fram
         let grayscale_chunk = ((pixels_per_thread * THREADS)..(H_DISPLAY * V_DISPLAY))
             .map(|pixel_index| {
                 let total_index = visible_to_total_index(pixel_index as usize);
-                let t = DiscreteTime {
-                    numerator: total_index + total_index_offset,
-                    denominator: DOT_CLOCK,
-                };
 
-                (modulator.sample(&t) * (255.0 / 2.0) + 255.0 / 2.0).round() as u8
+                (modulator.sample(total_index) * (255.0 / 2.0) + 255.0 / 2.0).round() as u8
             })
             .collect::<Vec<_>>();
 

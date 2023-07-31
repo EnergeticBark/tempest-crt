@@ -1,4 +1,4 @@
-use super::{DiscreteTime, Pcm, PcmFormat, Signal};
+use super::{Pcm, PcmFormat, Signal};
 
 pub enum Interpolation {
     Nearest,
@@ -11,9 +11,8 @@ impl<T> Signal for Nearest<Pcm<T>>
 where
     T: PcmFormat,
 {
-    fn sample(&self, t: &DiscreteTime) -> f32 {
-        let sample_index =
-            (t.numerator as f32 / t.denominator as f32 * self.0.sample_rate as f32) as usize;
+    fn sample(&self, total_index: u32) -> f32 {
+        let sample_index = (total_index as f32 / self.0.pixels_per_sample).floor() as usize;
 
         self.0.samples[sample_index].amplitude()
     }
@@ -25,10 +24,9 @@ impl<T> Signal for Linear<Pcm<T>>
 where
     T: PcmFormat,
 {
-    fn sample(&self, t: &DiscreteTime) -> f32 {
-        let floating_sample_index =
-            t.numerator as f32 / t.denominator as f32 * self.0.sample_rate as f32;
-        let sample_index = floating_sample_index as usize;
+    fn sample(&self, total_index: u32) -> f32 {
+        let floating_sample_index = total_index as f32 / self.0.pixels_per_sample;
+        let sample_index = floating_sample_index.floor() as usize;
 
         let t = floating_sample_index.fract();
         let sample = self.0.samples[sample_index].amplitude();
