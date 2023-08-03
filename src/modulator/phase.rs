@@ -1,9 +1,9 @@
 use std::num::Wrapping;
-use std::ops::{Add, Mul};
+use std::ops::{Add, AddAssign, Mul};
 
 // We need to multiply by very large pixel indices, and f32 loses too much precision.
 // So we're going to represent the decimal part of the phase as a u32,
-// where 0° = 0 and 360° = u32::MAX.
+// where 0° = 0 and 360° = u32::MAX + 1.
 #[derive(Copy, Clone)]
 pub struct Phase(pub(super) Wrapping<u32>);
 
@@ -49,5 +49,11 @@ impl Add<Self> for Phase {
 
     fn add(self, rhs: Self) -> Self::Output {
         Self(self.0 + rhs.0)
+    }
+}
+
+impl AddAssign for Phase {
+    fn add_assign(&mut self, rhs: Self) {
+        *self = *self + rhs
     }
 }

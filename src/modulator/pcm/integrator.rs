@@ -8,7 +8,7 @@ struct IntegratedSample<T: PcmFormat> {
     // The PCM sample itself.
     sample: T,
     // The cumulative phase shift of all previous phase shifts.
-    // Phase is represented by a u32, with 0 being 0° and u32::MAX being a full 360° turn.
+    // Phase is represented by a u32, with 0 being 0° and u32::MAX + 1 being a full 360° turn.
     cum_phase: Phase,
 }
 
@@ -35,17 +35,13 @@ where
             .0
             .samples
             .iter()
-            .enumerate()
-            .scan(Phase(Wrapping(0)), |phase, (index, &sample)| {
+            .scan(Phase(Wrapping(0)), |phase, &sample| {
                 let integrated = IntegratedSample {
                     sample,
                     cum_phase: *phase,
                 };
-
                 let phase_per_sample = Phase::from(sample.amplitude() / self.0.sample_rate as f32);
-
-                *phase = *phase + phase_per_sample;
-
+                *phase += phase_per_sample;
                 Some(integrated)
             })
             .collect();
@@ -66,12 +62,12 @@ where
         let index = (total_index as f32 / self.0.pixels_per_sample).floor() as usize;
         let int_sample = &self.0.samples[index];
 
-        let aaaa = int_sample.sample.amplitude() / self.0.sample_rate as f32
-            * (total_index as f32 / self.0.pixels_per_sample).fract();
+        let current_sample_phase = Phase::from(
+            int_sample.sample.amplitude() / self.0.sample_rate as f32
+                * (total_index as f32 / self.0.pixels_per_sample).fract(),
+        );
 
-        let phase_per_pixel = Phase::from(aaaa);
-
-        int_sample.cum_phase + phase_per_pixel
+        int_sample.cum_phase + current_sample_phase
     }
 }
 

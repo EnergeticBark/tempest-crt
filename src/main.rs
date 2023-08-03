@@ -1,7 +1,7 @@
-const H_TOTAL: u32 = 1344;
-const V_TOTAL: u32 = 806;
-const H_DISPLAY: u32 = 1024;
-const V_DISPLAY: u32 = 768;
+const H_TOTAL: u32 = 1880;
+const V_TOTAL: u32 = 1082;
+const H_DISPLAY: u32 = 1400;
+const V_DISPLAY: u32 = 1050;
 const VERTICAL_SYNC: f64 = 60.00;
 const DOT_CLOCK: u32 = (H_TOTAL as f64 * V_TOTAL as f64 * VERTICAL_SYNC) as u32;
 const THREADS: u32 = 8;
@@ -43,7 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pcm_loader: PcmLoader<Signed16Le> = PcmLoader::open("/tmp/virtualdevice", 44100).unwrap();
     //pcm_loader.set_interp(Interpolation::Linear);
     let integrated_loader = PreintegratedLoader::new(pcm_loader);
-    let mut carrier = Square::from_freq(44000000, DOT_CLOCK);
+    let mut carrier = Sine::from_freq(44000000, DOT_CLOCK);
     let mut information = integrated_loader;
     //let mut information = pcm_loader;
     //let mut information = Sine::from_freq(wave_freq, DOT_CLOCK);

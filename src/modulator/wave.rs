@@ -32,12 +32,12 @@ impl Signal for Sine {
     }
 }
 
-/*impl FmCarrier for Sine {
-    fn sample_with_deviation(&self, t: &DiscreteTime, deviation: Phase) -> f32 {
-        let phase = t.to_phase(self.frequency) + deviation;
+impl FmCarrier for Sine {
+    fn sample_with_deviation(&self, total_index: u32, deviation: Phase) -> f32 {
+        let phase = self.starting_angle + self.phase_per_pixel * total_index + deviation;
         (std::f32::consts::TAU * phase.float()).sin()
     }
-}*/
+}
 
 impl IntSignal for Sine {
     fn sample(&self, total_index: u32) -> Phase {
