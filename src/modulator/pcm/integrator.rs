@@ -16,12 +16,13 @@ struct IntegratedPcm<T: PcmFormat> {
     samples: Vec<IntegratedSample<T>>,
     sample_rate: usize,
     pixels_per_sample: f32,
+    final_phase: Phase,
 }
 
 trait Integrable {
     type Interpolation;
 
-    fn integrate(self) -> Self::Interpolation;
+    fn integrate(self, starting_angle: Phase) -> Self::Interpolation;
 }
 
 impl<T> Integrable for Nearest<Pcm<T>>
@@ -30,26 +31,30 @@ where
 {
     type Interpolation = Nearest<IntegratedPcm<T>>;
 
-    fn integrate(self) -> Self::Interpolation {
+    fn integrate(self, starting_angle: Phase) -> Self::Interpolation {
+        let mut phase = starting_angle;
         let samples: Vec<IntegratedSample<T>> = self
             .0
             .samples
             .iter()
-            .scan(Phase(Wrapping(0)), |phase, &sample| {
+            .map(|&sample| {
                 let integrated = IntegratedSample {
                     sample,
-                    cum_phase: *phase,
+                    cum_phase: phase,
                 };
                 let phase_per_sample = Phase::from(sample.amplitude() / self.0.sample_rate as f32);
-                *phase += phase_per_sample;
-                Some(integrated)
+                phase += phase_per_sample;
+                dbg!(phase.0);
+                integrated
             })
             .collect();
+        println!("END FRAME");
 
         Nearest(IntegratedPcm {
             samples,
             sample_rate: self.0.sample_rate,
             pixels_per_sample: self.0.pixels_per_sample,
+            final_phase: phase,
         })
     }
 }
@@ -73,6 +78,7 @@ where
 
 pub struct PreintegratedLoader<T: PcmFormat> {
     internal_loader: PcmLoader<T>,
+    starting_angle: Phase,
 }
 
 impl<T> PreintegratedLoader<T>
@@ -80,7 +86,10 @@ where
     T: PcmFormat + 'static,
 {
     pub fn new(internal_loader: PcmLoader<T>) -> Self {
-        Self { internal_loader }
+        Self {
+            internal_loader,
+            starting_angle: Phase(Wrapping(0)),
+        }
     }
 
     pub fn next_frame(&mut self) -> Result<(), Box<dyn Error>> {
@@ -94,7 +103,9 @@ where
 
         //match &self.internal_loader.interpolation {
         //  Interpolation::Nearest => {
-        Box::new(Nearest(pcm).integrate())
+        let integrated = Nearest(pcm).integrate(self.starting_angle);
+        self.starting_angle = integrated.0.final_phase;
+        Box::new(integrated)
         //}
         //Interpolation::Linear => Box::new(Linear(pcm)),
         //}

@@ -21,7 +21,7 @@ impl Sine {
     }
 
     pub fn next_frame(&mut self, frame_size: u32) {
-        self.starting_angle = self.starting_angle + self.phase_per_pixel * frame_size;
+        self.starting_angle += self.phase_per_pixel * frame_size;
     }
 }
 
@@ -62,7 +62,7 @@ impl Square {
     }
 
     pub fn next_frame(&mut self, frame_size: u32) {
-        self.starting_angle = self.starting_angle + self.phase_per_pixel * frame_size;
+        self.starting_angle += self.phase_per_pixel * frame_size;
     }
 }
 
